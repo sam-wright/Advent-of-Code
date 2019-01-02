@@ -3,9 +3,9 @@ use std::fs::File;
 use std::io::{self, Read};
 
 fn main() -> io::Result<()> {
-    //let mut file = File::open("input.txt")?;
+    let mut file = File::open("input.txt")?;
     //let mut file = File::open("test_input.txt")?;
-    let mut file = File::open("test_input2.txt")?;
+    //let mut file = File::open("test_input2.txt")?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
@@ -16,8 +16,8 @@ fn main() -> io::Result<()> {
     ];
 
     let mut hash = HashMap::new();
-    for line in collection {
-        //println!("{} --", &line);
+    for line in &collection {
+        println!("{} --", &line);
 
         let mut double = false;
         let mut triple = false;
@@ -56,6 +56,25 @@ fn main() -> io::Result<()> {
     }
 
     println!("total_hash = {}", total_hash);
+
+    // Part-2
+    for line in &collection {
+        for compline in &collection {
+            let mut resline = String::from("");
+            for i in 0..line.len() {
+                if line.as_bytes()[i] == compline.as_bytes()[i] {
+                    resline.push_str(&line[i..=i]);
+                }
+            }
+
+            if resline.len() + 1 == line.len() {
+                println!(
+                    "I think we have a match!!\nline\t--\t{}\ncmpline\t--\t{}\nresline\t--\t{}",
+                    line, compline, resline
+                );
+            }
+        }
+    }
 
     Ok(())
 }
