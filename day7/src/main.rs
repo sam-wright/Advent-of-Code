@@ -11,10 +11,9 @@ struct Thing {
 }
 
 impl Thing {
-    fn new() -> Thing {
+    fn new() -> Self {
         Thing {
             depends: Vec::new(),
-            //depends: depends,
             complete: true,
         }
     }
@@ -32,7 +31,7 @@ fn main() -> io::Result<()> {
     let name_re = Regex::new(r"step (\w)").expect("Regex creation failed");
     let depends_re = Regex::new(r"Step (\w)").expect("Regex creation failed");
 
-    let mut instructions = HashMap::new();
+    let mut instructions: HashMap<char, Thing> = HashMap::new();
     for line in collection {
         let name = name_re
             .captures(&line)
@@ -46,7 +45,6 @@ fn main() -> io::Result<()> {
             .get(1)
             .map_or(0 as char, |v| v.as_str().chars().next().expect(""));
 
-        //instructions.insert(name, Thing::new(depends));
         let a = instructions.entry(name).or_insert_with(Thing::new);
         a.depends.push(depends);
         a.complete = false;
@@ -57,28 +55,50 @@ fn main() -> io::Result<()> {
     }
 
     print!("\n");
-
     for i in &instructions {
         println!("{:?}", &i);
     }
+    let mut entry = 'A';
 
-    let mut running = true;
-    while running {
-        running = false;
+    let mut completion_order = Vec::with_capacity(100);
 
-        let steps = instructions.iter();
-        for (i,  step) in steps {
-            // for each instruction
-            let mut this = instructions.get(&i).expect("could not get this");
+    completion_order.push('C');
+
+    for _ in 0..100 {
+        for (me, this) in &instructions {
+            // for each instruction step
+
+            // make sure we haven't already completed this step
+            if completion_order.contains(&*me) {
+                continue;
+            }
+
+            let mut complete = true;
             for d in &this.depends {
-                let dep = instructions.get(&d).expect("missing dpendancy");
-
-                if !dep.complete {
+                // check each dependancy
+                if !instructions.get(&d).expect("missing dependancy").complete {
+                    complete = false;
                     break;
                 }
             }
-            step.complete = true;
+            entry = *me;
+            if complete {
+                // if its dependancies are met,
+                // go mark it complete
+                completion_order.push(*me);
+                println!("pushing {}", &me);
+                break;
+            }
         }
+
+        instructions
+            .get_mut(&entry)
+            .expect("missing dependancy")
+            .complete = true;
+    }
+
+    for c in &completion_order {
+        print!("{}", c);
     }
     Ok(())
 }
