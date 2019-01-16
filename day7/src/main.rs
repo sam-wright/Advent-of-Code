@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
 extern crate regex;
+use petgraph::Graph;
 use regex::Regex;
 
 #[derive(Debug)]
@@ -32,6 +33,7 @@ fn main() -> io::Result<()> {
     let depends_re = Regex::new(r"Step (\w)").expect("Regex creation failed");
 
     let mut instructions: HashMap<char, Thing> = HashMap::new();
+    let mut graph = Graph::<char, char>::new();
     for line in collection {
         let name = name_re
             .captures(&line)
@@ -45,6 +47,23 @@ fn main() -> io::Result<()> {
             .get(1)
             .map_or(0 as char, |v| v.as_str().chars().next().expect(""));
 
+        let n = match graph
+            .node_indices()
+            .find(|f| graph.node_weight(*f) == Some(&name))
+        {
+            Some(v) => v,
+            None => graph.add_node(name),
+        };
+
+        let d = match graph
+            .node_indices()
+            .find(|f| graph.node_weight(*f) == Some(&depends))
+        {
+            Some(v) => v,
+            None => graph.add_node(depends),
+        };
+        graph.extend_with_edges(&[(n, d)]);
+
         let a = instructions.entry(name).or_insert_with(Thing::new);
         a.depends.push(depends);
         a.complete = false;
@@ -54,51 +73,52 @@ fn main() -> io::Result<()> {
         println!("{:?}", line);
     }
 
+    println!("{:?}", &graph);
     print!("\n");
     for i in &instructions {
         println!("{:?}", &i);
     }
-    let mut entry = 'A';
+    // let mut entry = 'A';
 
-    let mut completion_order = Vec::with_capacity(100);
+    // let mut completion_order = Vec::with_capacity(100);
 
-    completion_order.push('C');
+    // completion_order.push('C');
 
-    for _ in 0..100 {
-        for (me, this) in &instructions {
-            // for each instruction step
+    // for _ in 0..100 {
+    //     for (me, this) in &instructions {
+    //         // for each instruction step
 
-            // make sure we haven't already completed this step
-            if completion_order.contains(&*me) {
-                continue;
-            }
+    //         // make sure we haven't already completed this step
+    //         if completion_order.contains(&*me) {
+    //             continue;
+    //         }
 
-            let mut complete = true;
-            for d in &this.depends {
-                // check each dependancy
-                if !instructions.get(&d).expect("missing dependancy").complete {
-                    complete = false;
-                    break;
-                }
-            }
-            entry = *me;
-            if complete {
-                // if its dependancies are met,
-                // go mark it complete
-                completion_order.push(*me);
-                println!("pushing {}", &me);
-                break;
-            }
-        }
+    //         let mut complete = true;
+    //         for d in &this.depends {
+    //             // check each dependancy
+    //             if !instructions.get(&d).expect("missing dependancy").complete {
+    //                 complete = false;
+    //                 break;
+    //             }
+    //         }
+    //         entry = *me;
+    //         if complete {
+    //             // if its dependancies are met,
+    //             // go mark it complete
+    //             completion_order.push(*me);
+    //             println!("pushing {}", &me);
+    //             break;
+    //         }
+    //     }
 
-        instructions
-            .get_mut(&entry)
-            .expect("missing dependancy")
-            .complete = true;
-    }
+    //     instructions
+    //         .get_mut(&entry)
+    //         .expect("missing dependancy")
+    //         .complete = true;
+    // }
 
-    for c in &completion_order {
-        print!("{}", c);
-    }
+    // for c in &completion_order {
+    //     print!("{}", c);
+    // }
     Ok(())
 }
