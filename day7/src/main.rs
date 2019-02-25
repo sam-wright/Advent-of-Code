@@ -2,6 +2,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
 extern crate regex;
+use petgraph::algo::toposort;
+use petgraph::algo::DfsSpace;
+use petgraph::visit::Dfs;
+use petgraph::visit::DfsPostOrder;
 use petgraph::Graph;
 use regex::Regex;
 
@@ -33,7 +37,7 @@ fn main() -> io::Result<()> {
     let depends_re = Regex::new(r"Step (\w)").expect("Regex creation failed");
 
     let mut instructions: HashMap<char, Thing> = HashMap::new();
-    let mut graph = Graph::<char, char>::new();
+    let mut graph = Graph::<char, i32>::new();
     for line in collection {
         let name = name_re
             .captures(&line)
@@ -62,7 +66,7 @@ fn main() -> io::Result<()> {
             Some(v) => v,
             None => graph.add_node(depends),
         };
-        graph.extend_with_edges(&[(n, d)]);
+        graph.add_edge(d, n, 1);
 
         let a = instructions.entry(name).or_insert_with(Thing::new);
         a.depends.push(depends);
@@ -78,47 +82,21 @@ fn main() -> io::Result<()> {
     for i in &instructions {
         println!("{:?}", &i);
     }
-    // let mut entry = 'A';
 
-    // let mut completion_order = Vec::with_capacity(100);
+    let mut space = toposort(&graph, None).expect("Unable to sort");
+    println!("{:?}", space);
+    //space.reverse();
+    for s in &space {
+        print!("{}", graph.node_weight(*s).expect("could not get"));
+    }
+    println!("\n");
 
-    // completion_order.push('C');
+    let mut dfs = Dfs::new(&graph, *space.first().expect(""));
+    while let Some(nx) = dfs.next(&graph) {
+        print!("{:?}", graph.node_weight(nx).expect("could not get"));
+    }
 
-    // for _ in 0..100 {
-    //     for (me, this) in &instructions {
-    //         // for each instruction step
+    println!("\n");
 
-    //         // make sure we haven't already completed this step
-    //         if completion_order.contains(&*me) {
-    //             continue;
-    //         }
-
-    //         let mut complete = true;
-    //         for d in &this.depends {
-    //             // check each dependancy
-    //             if !instructions.get(&d).expect("missing dependancy").complete {
-    //                 complete = false;
-    //                 break;
-    //             }
-    //         }
-    //         entry = *me;
-    //         if complete {
-    //             // if its dependancies are met,
-    //             // go mark it complete
-    //             completion_order.push(*me);
-    //             println!("pushing {}", &me);
-    //             break;
-    //         }
-    //     }
-
-    //     instructions
-    //         .get_mut(&entry)
-    //         .expect("missing dependancy")
-    //         .complete = true;
-    // }
-
-    // for c in &completion_order {
-    //     print!("{}", c);
-    // }
     Ok(())
 }
