@@ -1,287 +1,310 @@
-#[cfg(test)]
-mod tests {
-    use std::io;
-    use OpCode::*;
-    use ParameterMode::*;
+// use std::io;
+use OpCode::*;
+use ParameterMode::*;
 
-    enum OpCode {
-        Add = 1,
-        Multiply = 2,
-        Input = 3,
-        Output = 4,
-        JumpIfTrue = 5,
-        JumpIfFalse = 6,
-        LessThan = 7,
-        Equals = 8,
-        Halt = 99,
+enum OpCode {
+    Add = 1,
+    Multiply = 2,
+    Input = 3,
+    Output = 4,
+    JumpIfTrue = 5,
+    JumpIfFalse = 6,
+    LessThan = 7,
+    Equals = 8,
+    Halt = 99,
+}
+
+#[derive(PartialEq, Debug)]
+enum ParameterMode {
+    Position = 0,
+    Immediate = 1,
+}
+
+fn get_instruction_size(input: isize) -> usize {
+    match input % 100 {
+        x if x == Add as isize => 4,
+        x if x == Multiply as isize => 4,
+        x if x == Input as isize => 2,
+        x if x == Output as isize => 2,
+        x if x == Halt as isize => 1,
+        x if x == JumpIfTrue as isize => 3,
+        x if x == JumpIfFalse as isize => 3,
+        x if x == LessThan as isize => 4,
+        x if x == Equals as isize => 4,
+        _ => panic!("Invalid OpCode"),
     }
+}
 
-    #[derive(PartialEq, Debug)]
-    enum ParameterMode {
-        Position = 0,
-        Immediate = 1,
-    }
+fn decode_opcode(input: isize) -> (isize, ParameterMode, ParameterMode, ParameterMode) {
+    let opcode = input % 100;
+    let parameter1 = if (input / 100) % 10 == 1 {
+        Immediate
+    } else {
+        Position
+    };
+    let parameter2 = if (input / 1000) % 10 == 1 {
+        Immediate
+    } else {
+        Position
+    };
+    let parameter3 = if (input / 10000) % 10 == 1 {
+        Immediate
+    } else {
+        Position
+    };
+    (opcode, parameter1, parameter2, parameter3)
+}
 
-    fn get_instruction_size(input: isize) -> usize {
-        match input % 100 {
-            x if x == Add as isize => 4,
-            x if x == Multiply as isize => 4,
-            x if x == Input as isize => 2,
-            x if x == Output as isize => 2,
-            x if x == Halt as isize => 1,
-            x if x == JumpIfTrue as isize => 3,
-            x if x == JumpIfFalse as isize => 3,
-            x if x == LessThan as isize => 4,
-            x if x == Equals as isize => 4,
-            _ => panic!("Invalid OpCode"),
+fn process_instruction(
+    memory: &mut [isize],
+    instruction: &[isize],
+    input: &mut Vec<isize>,
+) -> (bool, Option<usize>, Option<isize>) {
+    let (opcode, p1_mode, p2_mode, p3_mode) = decode_opcode(instruction[0]);
+    match opcode {
+        x if x == Add as isize => {
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1],
+                Position => memory[instruction[1] as usize],
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2],
+                Position => memory[instruction[2] as usize],
+            };
+            let p3 = instruction[3];
+
+            memory[p3 as usize] = p2 + p1;
+
+            (false, None, None)
         }
-    }
+        x if x == Multiply as isize => {
+            assert!(p3_mode == Position);
 
-    fn decode_opcode(input: isize) -> (isize, ParameterMode, ParameterMode, ParameterMode) {
-        let opcode = input % 100;
-        let parameter1 = if (input / 100) % 10 == 1 {
-            Immediate
-        } else {
-            Position
-        };
-        let parameter2 = if (input / 1000) % 10 == 1 {
-            Immediate
-        } else {
-            Position
-        };
-        let parameter3 = if (input / 10000) % 10 == 1 {
-            Immediate
-        } else {
-            Position
-        };
-        (opcode, parameter1, parameter2, parameter3)
-    }
+            let p1 = match p1_mode {
+                Immediate => instruction[1],
+                Position => memory[instruction[1] as usize],
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2],
+                Position => memory[instruction[2] as usize],
+            };
+            let p3 = instruction[3];
 
-    fn process_instruction(memory: &mut [isize], instruction: &[isize]) -> (bool, Option<usize>) {
-        let (opcode, p1_mode, p2_mode, p3_mode) = decode_opcode(instruction[0]);
-        match opcode {
-            x if x == Add as isize => {
-                assert!(p3_mode == Position);
+            memory[p3 as usize] = p2 * p1;
 
-                let p1 = match p1_mode {
-                    Immediate => instruction[1],
-                    Position => memory[instruction[1] as usize],
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2],
-                    Position => memory[instruction[2] as usize],
-                };
-                let p3 = instruction[3];
-
-                memory[p3 as usize] = p2 + p1;
-
-                (false, None)
-            }
-            x if x == Multiply as isize => {
-                assert!(p3_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1],
-                    Position => memory[instruction[1] as usize],
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2],
-                    Position => memory[instruction[2] as usize],
-                };
-                let p3 = instruction[3];
-
-                memory[p3 as usize] = p2 * p1;
-
-                (false, None)
-            }
-            x if x == Input as isize => {
-                assert!(p1_mode == Position);
-                assert!(p2_mode == Position);
-                assert!(p3_mode == Position);
-
-                let p1 = instruction[1] as usize;
-
-                println!("Please enter a number:");
-                let mut input = String::new();
-                io::stdin().read_line(&mut input).expect("Bad Input");
-
-                // Strip off the trailing LF
-                let len = input.len();
-                input.truncate(len - 1);
-
-                memory[p1] = isize::from_str_radix(&input, 10).expect("bad");
-
-                (false, None)
-            }
-            x if x == Output as isize => {
-                assert!(p2_mode == Position);
-                assert!(p3_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1] as usize,
-                    Position => memory[instruction[1] as usize] as usize,
-                };
-
-                println!("Output Value: {}", p1);
-
-                (false, None)
-            }
-
-            x if x == JumpIfTrue as isize => {
-                assert!(p3_mode == Position);
-                // assert!(p2_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1] as usize,
-                    Position => memory[instruction[1] as usize] as usize,
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2] as usize,
-                    Position => memory[instruction[2] as usize] as usize,
-                };
-
-                if p1 != 0 {
-                    (false, Some(p2))
-                } else {
-                    (false, None)
-                }
-            }
-
-            x if x == JumpIfFalse as isize => {
-                assert!(p3_mode == Position);
-                // assert!(p2_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1] as usize,
-                    Position => memory[instruction[1] as usize] as usize,
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2] as usize,
-                    Position => memory[instruction[2] as usize] as usize,
-                };
-
-                if p1 == 0 {
-                    (false, Some(p2))
-                } else {
-                    (false, None)
-                }
-            }
-
-            x if x == LessThan as isize => {
-                assert!(p3_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1] as usize,
-                    Position => memory[instruction[1] as usize] as usize,
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2] as usize,
-                    Position => memory[instruction[2] as usize] as usize,
-                };
-                let p3 = instruction[3] as usize;
-
-                memory[p3] = if p1 < p2 { 1 } else { 0 };
-
-                (false, None)
-            }
-
-            x if x == Equals as isize => {
-                assert!(p3_mode == Position);
-
-                let p1 = match p1_mode {
-                    Immediate => instruction[1] as usize,
-                    Position => memory[instruction[1] as usize] as usize,
-                };
-                let p2 = match p2_mode {
-                    Immediate => instruction[2] as usize,
-                    Position => memory[instruction[2] as usize] as usize,
-                };
-                let p3 = instruction[3] as usize;
-
-                memory[p3] = if p1 == p2 { 1 } else { 0 };
-
-                (false, None)
-            }
-
-            x if x == Halt as isize => {
-                assert!(p1_mode == Position);
-                assert!(p2_mode == Position);
-                assert!(p3_mode == Position);
-
-                (true, None)
-            }
-            _ => panic!("Invalid OpCode"),
+            (false, None, None)
         }
-    }
+        x if x == Input as isize => {
+            assert!(p1_mode == Position);
+            assert!(p2_mode == Position);
+            assert!(p3_mode == Position);
 
-    fn read_program(memory: &mut [isize]) {
-        let mut memory_location = 0;
-        let mut instruction = [0, 0, 0, 0];
+            let p1 = instruction[1] as usize;
+            let val = input.pop().expect("Unable to pop");
+            println!("Input value: {}", val);
+            memory[p1] = val;
 
-        let mut instruction_size = get_instruction_size(memory[memory_location]);
-        instruction[0..instruction_size]
-            .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
+            // println!("Please enter a number:");
+            // let mut input = String::new();
+            // io::stdin().read_line(&mut input).expect("Bad Input");
 
-        loop {
-            let (complete, addr_override) = process_instruction(memory, &instruction);
-            if complete {
-                break;
-            }
+            // // Strip off the trailing LF
+            // let len = input.len();
+            // input.truncate(len - 1);
+            // isize::from_str_radix(&input, 10).expect("bad")
 
-            match addr_override {
-                Some(v) => {
-                    memory_location = v;
-                }
-                None => {
-                    memory_location += instruction_size;
-                }
+            // };
+            (false, None, None)
+        }
+        x if x == Output as isize => {
+            assert!(p2_mode == Position);
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1],
+                Position => memory[instruction[1] as usize],
             };
 
-            instruction_size = get_instruction_size(memory[memory_location]);
-            instruction[0..instruction_size]
-                .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
+            println!("Output Value: {}", p1);
+
+            (false, None, Some(p1))
         }
+
+        x if x == JumpIfTrue as isize => {
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1] as usize,
+                Position => memory[instruction[1] as usize] as usize,
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2] as usize,
+                Position => memory[instruction[2] as usize] as usize,
+            };
+
+            if p1 != 0 {
+                (false, Some(p2), None)
+            } else {
+                (false, None, None)
+            }
+        }
+
+        x if x == JumpIfFalse as isize => {
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1] as usize,
+                Position => memory[instruction[1] as usize] as usize,
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2] as usize,
+                Position => memory[instruction[2] as usize] as usize,
+            };
+
+            if p1 == 0 {
+                (false, Some(p2), None)
+            } else {
+                (false, None, None)
+            }
+        }
+
+        x if x == LessThan as isize => {
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1] as usize,
+                Position => memory[instruction[1] as usize] as usize,
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2] as usize,
+                Position => memory[instruction[2] as usize] as usize,
+            };
+            let p3 = instruction[3] as usize;
+
+            memory[p3] = if p1 < p2 { 1 } else { 0 };
+
+            (false, None, None)
+        }
+
+        x if x == Equals as isize => {
+            assert!(p3_mode == Position);
+
+            let p1 = match p1_mode {
+                Immediate => instruction[1] as usize,
+                Position => memory[instruction[1] as usize] as usize,
+            };
+            let p2 = match p2_mode {
+                Immediate => instruction[2] as usize,
+                Position => memory[instruction[2] as usize] as usize,
+            };
+            let p3 = instruction[3] as usize;
+
+            memory[p3] = if p1 == p2 { 1 } else { 0 };
+
+            (false, None, None)
+        }
+
+        x if x == Halt as isize => {
+            assert!(p1_mode == Position);
+            assert!(p2_mode == Position);
+            assert!(p3_mode == Position);
+
+            (true, None, None)
+        }
+        _ => panic!("Invalid OpCode"),
     }
+}
+
+pub fn read_program(memory: &mut [isize], mut input: &mut Vec<isize>) -> isize {
+    let mut output = 0;
+    let mut memory_location = 0;
+    let mut instruction = [0, 0, 0, 0];
+
+    let mut instruction_size = get_instruction_size(memory[memory_location]);
+    instruction[0..instruction_size]
+        .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
+
+    loop {
+        let (complete, addr_override, output_var) =
+            process_instruction(memory, &instruction, &mut input);
+        if complete {
+            break;
+        }
+        match output_var {
+            Some(v) => output = v,
+            _ => (),
+        };
+
+        match addr_override {
+            Some(v) => {
+                memory_location = v;
+            }
+            None => {
+                memory_location += instruction_size;
+            }
+        };
+
+        instruction_size = get_instruction_size(memory[memory_location]);
+        instruction[0..instruction_size]
+            .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
+    }
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ParameterMode::{Immediate, Position};
+    use crate::{decode_opcode, read_program};
 
     #[test]
     fn part2_example1() {
-        let mut memory = [3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8];
+        let memory = [3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8];
         // Using position mode, consider whether the input is equal to 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        read_program(&mut memory);
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
     fn part2_example2() {
-        let mut memory = [3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8];
+        let memory = [3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8];
         // Using position mode, consider whether the input is less than 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        read_program(&mut memory);
+        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
     fn part2_example3() {
-        let mut memory = [3, 3, 1108, -1, 8, 3, 4, 3, 99];
+        let memory = [3, 3, 1108, -1, 8, 3, 4, 3, 99];
         // Using immediate mode, consider whether the input is equal to 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        read_program(&mut memory);
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
     fn part2_example4() {
-        let mut memory = [3, 3, 1107, -1, 8, 3, 4, 3, 99];
+        let memory = [3, 3, 1107, -1, 8, 3, 4, 3, 99];
         // Using immediate mode, consider whether the input is less than 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        read_program(&mut memory);
+        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
     fn part2_example5() {
-        let mut memory = [
+        let memory = [
             3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36, 98, 0,
             0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000, 1, 20, 4,
             20, 1105, 1, 46, 98, 99,
@@ -290,12 +313,14 @@ mod tests {
         // The program will then output 999 if the input value is below 8, output 1000 if
         // the input value is equal to 8, or output 1001 if the input value is greater than 8.
 
-        read_program(&mut memory);
+        assert_eq!(999, read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(1000, read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(1001, read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
     fn part1_2() {
-        let mut memory = [
+        let memory = [
             3, 225, 1, 225, 6, 6, 1100, 1, 238, 225, 104, 0, 1101, 32, 43, 225, 101, 68, 192, 224,
             1001, 224, -160, 224, 4, 224, 102, 8, 223, 223, 1001, 224, 2, 224, 1, 223, 224, 223,
             1001, 118, 77, 224, 1001, 224, -87, 224, 4, 224, 102, 8, 223, 223, 1001, 224, 6, 224,
@@ -335,9 +360,8 @@ mod tests {
             677, 224, 102, 2, 223, 223, 1005, 224, 659, 1001, 223, 1, 223, 108, 677, 677, 224,
             1002, 223, 2, 223, 1005, 224, 674, 101, 1, 223, 223, 4, 223, 99, 226,
         ];
-        read_program(&mut memory);
-        // Part-1: Prints 5821753
-        // Part-2: Prints 11956381
+        assert_eq!(5821753, read_program(&mut memory.clone(), &mut vec![1]));
+        assert_eq!(11956381, read_program(&mut memory.clone(), &mut vec![5]));
     }
 
     #[test]
@@ -353,7 +377,7 @@ mod tests {
     fn example1() {
         let mut memory = [1002, 4, 3, 4, 33];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [1002, 4, 3, 4, 99]);
     }
 
@@ -361,7 +385,7 @@ mod tests {
     fn example2() {
         let mut memory = [1101, 100, -1, 4, 0];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [1101, 100, -1, 4, 99]);
     }
 
@@ -369,22 +393,22 @@ mod tests {
     fn example3() {
         let mut memory = [3, 0, 4, 0, 99];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
     }
 
     #[test]
     fn example_input() {
         let mut memory = [3, 0, 99];
 
-        read_program(&mut memory);
-        assert_eq!(memory, [1, 0, 99]);
+        read_program(&mut memory, &mut vec![122]);
+        assert_eq!(memory, [122, 0, 99]);
     }
 
     #[test]
     fn example_output() {
         let mut memory = [4, 1, 99];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [4, 1, 99]);
     }
 
@@ -392,7 +416,7 @@ mod tests {
     fn example_add() {
         let mut memory = [1, 0, 0, 0, 99];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [2, 0, 0, 0, 99]);
     }
 
@@ -400,7 +424,7 @@ mod tests {
     fn example_multiply() {
         let mut memory = [2, 3, 0, 3, 99];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [2, 3, 0, 6, 99]);
     }
 
@@ -408,7 +432,7 @@ mod tests {
     fn example_day2() {
         let mut memory = [1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
 
-        read_program(&mut memory);
+        read_program(&mut memory, &mut vec![0]);
         assert_eq!(memory, [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]);
     }
 }
