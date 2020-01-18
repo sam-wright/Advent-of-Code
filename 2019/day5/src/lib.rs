@@ -20,6 +20,13 @@ enum ParameterMode {
     Immediate = 1,
 }
 
+pub enum Status {
+    Running,
+    Halted,
+    Paused,
+}
+use Status::*;
+
 fn get_instruction_size(input: isize) -> usize {
     match input % 100 {
         x if x == Add as isize => 4,
@@ -59,7 +66,7 @@ fn process_instruction(
     memory: &mut [isize],
     instruction: &[isize],
     input: &mut Vec<isize>,
-) -> (bool, Option<usize>, Option<isize>) {
+) -> (Status, Option<usize>, Option<isize>) {
     let (opcode, p1_mode, p2_mode, p3_mode) = decode_opcode(instruction[0]);
     match opcode {
         x if x == Add as isize => {
@@ -77,7 +84,7 @@ fn process_instruction(
 
             memory[p3 as usize] = p2 + p1;
 
-            (false, None, None)
+            (Running, None, None)
         }
         x if x == Multiply as isize => {
             assert!(p3_mode == Position);
@@ -94,7 +101,7 @@ fn process_instruction(
 
             memory[p3 as usize] = p2 * p1;
 
-            (false, None, None)
+            (Running, None, None)
         }
         x if x == Input as isize => {
             assert!(p1_mode == Position);
@@ -102,21 +109,15 @@ fn process_instruction(
             assert!(p3_mode == Position);
 
             let p1 = instruction[1] as usize;
-            let val = input.pop().expect("Unable to pop");
-            println!("Input value: {}", val);
-            memory[p1] = val;
+            if input.len() == 0 {
+                (Paused, None, None)
+            } else {
+                let val = input.pop().expect("Unable to pop");
+                println!("Input value: {}", val);
+                memory[p1] = val;
 
-            // println!("Please enter a number:");
-            // let mut input = String::new();
-            // io::stdin().read_line(&mut input).expect("Bad Input");
-
-            // // Strip off the trailing LF
-            // let len = input.len();
-            // input.truncate(len - 1);
-            // isize::from_str_radix(&input, 10).expect("bad")
-
-            // };
-            (false, None, None)
+                (Running, None, None)
+            }
         }
         x if x == Output as isize => {
             assert!(p2_mode == Position);
@@ -129,7 +130,7 @@ fn process_instruction(
 
             println!("Output Value: {}", p1);
 
-            (false, None, Some(p1))
+            (Running, None, Some(p1))
         }
 
         x if x == JumpIfTrue as isize => {
@@ -145,9 +146,9 @@ fn process_instruction(
             };
 
             if p1 != 0 {
-                (false, Some(p2), None)
+                (Running, Some(p2), None)
             } else {
-                (false, None, None)
+                (Running, None, None)
             }
         }
 
@@ -164,9 +165,9 @@ fn process_instruction(
             };
 
             if p1 == 0 {
-                (false, Some(p2), None)
+                (Running, Some(p2), None)
             } else {
-                (false, None, None)
+                (Running, None, None)
             }
         }
 
@@ -185,7 +186,7 @@ fn process_instruction(
 
             memory[p3] = if p1 < p2 { 1 } else { 0 };
 
-            (false, None, None)
+            (Running, None, None)
         }
 
         x if x == Equals as isize => {
@@ -203,7 +204,7 @@ fn process_instruction(
 
             memory[p3] = if p1 == p2 { 1 } else { 0 };
 
-            (false, None, None)
+            (Running, None, None)
         }
 
         x if x == Halt as isize => {
@@ -211,13 +212,13 @@ fn process_instruction(
             assert!(p2_mode == Position);
             assert!(p3_mode == Position);
 
-            (true, None, None)
+            (Halted, None, None)
         }
         _ => panic!("Invalid OpCode"),
     }
 }
 
-pub fn read_program(memory: &mut [isize], mut input: &mut Vec<isize>) -> isize {
+pub fn read_program(memory: &mut [isize], mut input: &mut Vec<isize>) -> Result<isize, isize> {
     let mut output = 0;
     let mut memory_location = 0;
     let mut instruction = [0, 0, 0, 0];
@@ -227,11 +228,15 @@ pub fn read_program(memory: &mut [isize], mut input: &mut Vec<isize>) -> isize {
         .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
 
     loop {
-        let (complete, addr_override, output_var) =
+        let (status, addr_override, output_var) =
             process_instruction(memory, &instruction, &mut input);
-        if complete {
-            break;
-        }
+
+        match status {
+            Halted => return Ok(output),
+            Paused => return Err(output),
+            Running => {}
+        };
+
         match output_var {
             Some(v) => output = v,
             _ => (),
@@ -250,7 +255,6 @@ pub fn read_program(memory: &mut [isize], mut input: &mut Vec<isize>) -> isize {
         instruction[0..instruction_size]
             .copy_from_slice(&memory[memory_location..memory_location + instruction_size]);
     }
-    output
 }
 
 #[cfg(test)]
@@ -264,9 +268,9 @@ mod tests {
         // Using position mode, consider whether the input is equal to 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![7]));
-        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![8]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(Ok(1), read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
@@ -275,9 +279,9 @@ mod tests {
         // Using position mode, consider whether the input is less than 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![7]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![8]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
+        assert_eq!(Ok(1), read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
@@ -286,9 +290,9 @@ mod tests {
         // Using immediate mode, consider whether the input is equal to 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![7]));
-        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![8]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(Ok(1), read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
@@ -297,9 +301,9 @@ mod tests {
         // Using immediate mode, consider whether the input is less than 8;
         // output 1 (if it is) or 0 (if it is not).
 
-        assert_eq!(1, read_program(&mut memory.clone(), &mut vec![7]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![8]));
-        assert_eq!(0, read_program(&mut memory.clone(), &mut vec![9]));
+        assert_eq!(Ok(1), read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(Ok(0), read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
@@ -313,9 +317,9 @@ mod tests {
         // The program will then output 999 if the input value is below 8, output 1000 if
         // the input value is equal to 8, or output 1001 if the input value is greater than 8.
 
-        assert_eq!(999, read_program(&mut memory.clone(), &mut vec![7]));
-        assert_eq!(1000, read_program(&mut memory.clone(), &mut vec![8]));
-        assert_eq!(1001, read_program(&mut memory.clone(), &mut vec![9]));
+        assert_eq!(Ok(999), read_program(&mut memory.clone(), &mut vec![7]));
+        assert_eq!(Ok(1000), read_program(&mut memory.clone(), &mut vec![8]));
+        assert_eq!(Ok(1001), read_program(&mut memory.clone(), &mut vec![9]));
     }
 
     #[test]
@@ -360,8 +364,11 @@ mod tests {
             677, 224, 102, 2, 223, 223, 1005, 224, 659, 1001, 223, 1, 223, 108, 677, 677, 224,
             1002, 223, 2, 223, 1005, 224, 674, 101, 1, 223, 223, 4, 223, 99, 226,
         ];
-        assert_eq!(5821753, read_program(&mut memory.clone(), &mut vec![1]));
-        assert_eq!(11956381, read_program(&mut memory.clone(), &mut vec![5]));
+        assert_eq!(Ok(5821753), read_program(&mut memory.clone(), &mut vec![1]));
+        assert_eq!(
+            Ok(11956381),
+            read_program(&mut memory.clone(), &mut vec![5])
+        );
     }
 
     #[test]
