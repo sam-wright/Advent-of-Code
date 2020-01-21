@@ -11,6 +11,8 @@ mod tests {
     #[derive(Debug)]
     struct Image {
         layers: Vec<Layer>,
+        height: usize,
+        width: usize,
     }
 
     impl Layer {
@@ -27,8 +29,6 @@ mod tests {
         fn count_char(&self, input: &str) -> usize {
             let digit = input.as_bytes()[0];
 
-            //println!("Counting the number of {}'s", &digit);
-
             let val = self.pixels.iter().flatten().fold(0, |mut acc, &v| {
                 if v == digit {
                     acc += 1;
@@ -42,7 +42,11 @@ mod tests {
 
     impl Image {
         fn new(input: &str, width: usize, height: usize) -> Self {
-            let mut new_image = Image { layers: Vec::new() };
+            let mut new_image = Image {
+                layers: Vec::new(),
+                height,
+                width,
+            };
             let chars = input.as_bytes();
             let chunks = chars.chunks_exact(width * height);
 
@@ -54,10 +58,39 @@ mod tests {
             println!("Found {} layers", new_image.layers.len());
             new_image
         }
+
+        fn get_pixel(&self, w: usize, h: usize) -> char {
+            for l in self.layers.iter() {
+                let v = l.pixels[h][w];
+                match v {
+                    x if x == '0' as u8 => return ' ',
+                    x if x == '1' as u8 => return '.',
+                    _ => (),
+                }
+            }
+            ' '
+        }
+
+        fn render(&self) {
+            //To do
+            for h in 0..self.height {
+                for w in 0..self.width {
+                    print!("{}", self.get_pixel(w, h));
+                }
+                println!();
+            }
+            println!();
+        }
     }
 
     #[test]
-    fn part1() {
+    fn example2() {
+        let image = Image::new("0222112222120000", 2, 2);
+        image.render();
+    }
+
+    #[test]
+    fn part1_2() {
         let data = fs::read_to_string("input.txt").expect("Unable to read file");
         let image = Image::new(&data, 25, 6);
 
@@ -81,6 +114,8 @@ mod tests {
 
         assert_eq!(ones, 24);
         assert_eq!(twos, 121);
+
+        image.render();
     }
 
     #[test]
