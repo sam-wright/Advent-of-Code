@@ -191,7 +191,9 @@ impl IntcodeComputer {
                     }
                     (Running, Some(p2 as usize), None)
                 } else {
-                    println!();
+                    if VERBOSE {
+                        println!();
+                    }
                     (Running, None, None)
                 }
             }
@@ -282,7 +284,7 @@ impl IntcodeComputer {
         chunk
     }
 
-    pub fn read_program(program: &mut [isize], mut input: &mut Vec<isize>) -> Result<isize, isize> {
+    pub fn read_program(program: &[isize], mut input: &mut Vec<isize>) -> Result<isize, isize> {
         color_backtrace::install();
 
         let mut computer = IntcodeComputer::new();
@@ -352,7 +354,7 @@ mod tests {
 
     #[test]
     fn part_1() {
-        let mut memory = [
+        let memory = [
             1102, 34463338, 34463338, 63, 1007, 63, 34463338, 63, 1005, 63, 53, 1101, 0, 3, 1000,
             109, 988, 209, 12, 9, 1000, 209, 6, 209, 3, 203, 0, 1008, 1000, 1, 63, 1005, 63, 65,
             1008, 1000, 2, 63, 1005, 63, 904, 1008, 1000, 0, 63, 1005, 63, 58, 4, 25, 104, 0, 99,
@@ -406,41 +408,45 @@ mod tests {
             1, -1, -2, 1105, 1, 968, 21202, -2, 1, -2, 109, -3, 2106, 0, 0,
         ];
 
-        // Guessed 203, too low
         assert_eq!(
             Ok(3380552333),
-            IntcodeComputer::read_program(&mut memory, &mut vec![1])
+            IntcodeComputer::read_program(&memory, &mut vec![1])
+        );
+
+        assert_eq!(
+            Ok(78831),
+            IntcodeComputer::read_program(&memory, &mut vec![2])
         );
     }
 
     #[test]
     fn example1_1() {
         //takes no input and produces a copy of itself as output.
-        let mut memory = [
+        let memory = [
             109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
         ];
-        IntcodeComputer::read_program(&mut memory, &mut vec![0]).unwrap();
+        IntcodeComputer::read_program(&memory, &mut vec![0]).unwrap();
     }
 
     #[test]
     fn example1_2() {
         //should output a 16-digit number.
-        let mut memory = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
+        let memory = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
 
         assert_eq!(
             Ok(1_219_070_632_396_864),
-            IntcodeComputer::read_program(&mut memory, &mut vec![0])
+            IntcodeComputer::read_program(&memory, &mut vec![0])
         );
     }
 
     #[test]
     fn example1_3() {
         //should output the large number in the middle.
-        let mut memory = [104, 1125899906842624, 99];
+        let memory = [104, 1125899906842624, 99];
 
         assert_eq!(
             Ok(1125899906842624),
-            IntcodeComputer::read_program(&mut memory, &mut vec![0])
+            IntcodeComputer::read_program(&memory, &mut vec![0])
         );
     }
 
@@ -488,11 +494,11 @@ mod tests {
         ];
         assert_eq!(
             Ok(5821753),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![1])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![1])
         );
         assert_eq!(
             Ok(11956381),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![5])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![5])
         );
     }
 
@@ -504,15 +510,15 @@ mod tests {
 
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![7])
         );
         assert_eq!(
             Ok(1),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![8])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![9])
         );
     }
 
@@ -524,15 +530,15 @@ mod tests {
 
         assert_eq!(
             Ok(1),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![7])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![8])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![9])
         );
     }
 
@@ -544,15 +550,15 @@ mod tests {
 
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![7])
         );
         assert_eq!(
             Ok(1),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![8])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![9])
         );
     }
 
@@ -564,15 +570,15 @@ mod tests {
 
         assert_eq!(
             Ok(1),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![7])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![8])
         );
         assert_eq!(
             Ok(0),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![9])
         );
     }
 
@@ -589,15 +595,15 @@ mod tests {
 
         assert_eq!(
             Ok(999),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![7])
         );
         assert_eq!(
             Ok(1000),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![8])
         );
         assert_eq!(
             Ok(1001),
-            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+            IntcodeComputer::read_program(&memory.clone(), &mut vec![9])
         );
     }
 }
