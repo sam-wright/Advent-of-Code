@@ -3,8 +3,10 @@ use ParameterMode::*;
 
 use std::collections::HashMap;
 
+const VERBOSE: bool = false;
+
 pub struct IntcodeComputer {
-    relative_base: usize,
+    relative_base: isize,
     memory: HashMap<usize, isize>,
 }
 
@@ -90,11 +92,18 @@ impl IntcodeComputer {
     fn get_parameter(&mut self, mode: ParameterMode, instruction: isize) -> isize {
         match mode {
             Immediate => instruction,
-            Position => *self.memory.entry(*&instruction as usize).or_insert(0),
+            Position => *self.memory.entry(instruction as usize).or_insert(0),
             Relative => *self
                 .memory
-                .entry((instruction + self.relative_base as isize) as usize)
+                .entry((instruction + self.relative_base) as usize)
                 .or_insert(0),
+        }
+    }
+    fn get_output_parameter(&mut self, mode: ParameterMode, instruction: isize) -> isize {
+        match mode {
+            Position => instruction,
+            Relative => instruction + self.relative_base,
+            _ => panic!("Bad parameter mode!"),
         }
     }
 
@@ -104,16 +113,24 @@ impl IntcodeComputer {
         input: &mut Vec<isize>,
     ) -> (Status, Option<usize>, Option<isize>) {
         let (opcode, p1_mode, p2_mode, p3_mode) = decode_opcode(instruction[0]);
+        if VERBOSE {
+            print!("Instruction:{:?}\t", &instruction);
+            print!("{:?} {:?} {:?}\t", p1_mode, p2_mode, p3_mode,);
+        }
         match opcode {
             x if x == Add as isize => {
                 assert!(p3_mode != Immediate);
 
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
                 let p2 = self.get_parameter(p2_mode, instruction[2]);
-                let p3 = instruction[3];
+                let p3 = self.get_output_parameter(p3_mode, instruction[3]);
 
-                let e = self.memory.entry(*&p3 as usize).or_insert(0);
+                let e = self.memory.entry(p3 as usize).or_insert(0);
                 *e = p2 + p1;
+
+                if VERBOSE {
+                    println!("Add: memory[{}] = {} + {}", p3, p1, p2);
+                }
 
                 (Running, None, None)
             }
@@ -122,78 +139,90 @@ impl IntcodeComputer {
 
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
                 let p2 = self.get_parameter(p2_mode, instruction[2]);
-                let p3 = instruction[3];
+                let p3 = self.get_output_parameter(p3_mode, instruction[3]);
 
-                let e = self.memory.entry(*&p3 as usize).or_insert(0);
+                let e = self.memory.entry(p3 as usize).or_insert(0);
                 *e = p2 * p1;
+
+                if VERBOSE {
+                    println!("Mul: memory[{}] = {} * {}", p3, p1, p2);
+                }
 
                 (Running, None, None)
             }
             x if x == Input as isize => {
                 assert!(p1_mode != Immediate);
-                assert!(p2_mode != Immediate);
-                assert!(p3_mode != Immediate);
 
-                let p1 = instruction[1] as usize;
+                let p1 = self.get_output_parameter(p1_mode, instruction[1]);
 
                 if input.len() == 0 {
                     println!("Pausing evaluation, out of inputs");
                     (Paused, None, None)
                 } else {
                     let val = input.pop().expect("Unable to pop");
-                    println!("Input value: {}", val);
+                    // println!("Input value: {}", val);
 
-                    let e = self.memory.entry(*&p1 as usize).or_insert(0);
+                    let e = self.memory.entry(p1 as usize).or_insert(0);
                     *e = val;
+                    if VERBOSE {
+                        println!("Inp: memory[{}] = {}", p1, val);
+                    }
 
                     (Running, None, None)
                 }
             }
             x if x == Output as isize => {
-                assert!(p2_mode != Immediate);
-                assert!(p3_mode != Immediate);
-
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
 
-                println!("Output Value: {}", p1);
+                // if VERBOSE {
+                println!("Out: {}", p1);
+                // }
 
                 (Running, None, Some(p1))
             }
 
             x if x == JumpIfTrue as isize => {
-                assert!(p3_mode == Position);
-
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
-                let p2 = self.get_parameter(p2_mode, instruction[2]) as usize;
+                let p2 = self.get_parameter(p2_mode, instruction[2]);
 
                 if p1 != 0 {
-                    (Running, Some(p2), None)
+                    if VERBOSE {
+                        println!("Jump to {}", p2);
+                    }
+                    (Running, Some(p2 as usize), None)
                 } else {
+                    println!();
                     (Running, None, None)
                 }
             }
 
             x if x == JumpIfFalse as isize => {
-                assert!(p3_mode != Immediate);
-
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
-                let p2 = self.get_parameter(p2_mode, instruction[2]) as usize;
+                let p2 = self.get_parameter(p2_mode, instruction[2]);
 
                 if p1 == 0 {
-                    (Running, Some(p2), None)
+                    if VERBOSE {
+                        println!("Jump to {}", p2);
+                    }
+                    (Running, Some(p2 as usize), None)
                 } else {
+                    if VERBOSE {
+                        println!();
+                    }
                     (Running, None, None)
                 }
             }
 
             x if x == LessThan as isize => {
-                assert!(p3_mode != Immediate);
-
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
                 let p2 = self.get_parameter(p2_mode, instruction[2]);
-                let p3 = instruction[3] as usize;
+                let p3 = self.get_output_parameter(p3_mode, instruction[3]);
 
-                let e = self.memory.entry(*&p3 as usize).or_insert(0);
+                if VERBOSE {
+                    println!("LT: memory[{}] = ({}<{}={})", p3, p1, p2, p1 < p2);
+                }
+
+                let e = self.memory.entry(p3 as usize).or_insert(0);
                 *e = if p1 < p2 { 1 } else { 0 };
 
                 (Running, None, None)
@@ -204,25 +233,33 @@ impl IntcodeComputer {
 
                 let p1 = self.get_parameter(p1_mode, instruction[1]);
                 let p2 = self.get_parameter(p2_mode, instruction[2]);
-                let p3 = instruction[3] as usize;
+                let p3 = self.get_output_parameter(p3_mode, instruction[3]);
 
-                let e = self.memory.entry(*&p3 as usize).or_insert(0);
+                if VERBOSE {
+                    println!("EQ: memory[{}] = ({}=={}={})", p3, p1, p2, p1 == p2);
+                }
+
+                let e = self.memory.entry(p3 as usize).or_insert(0);
                 *e = if p1 == p2 { 1 } else { 0 };
 
                 (Running, None, None)
             }
 
             x if x == RelativeBaseOffset as isize => {
-                let p1 = self.get_parameter(p1_mode, instruction[1]) as usize;
+                let p1 = self.get_parameter(p1_mode, instruction[1]);
+
+                if VERBOSE {
+                    println!("RO: Adjusting {} by {}", self.relative_base, p1);
+                }
 
                 self.relative_base += p1;
                 (Running, None, None)
             }
 
             x if x == Halt as isize => {
-                assert!(p1_mode != Immediate);
-                assert!(p2_mode != Immediate);
-                assert!(p3_mode != Immediate);
+                if VERBOSE {
+                    println!("DONE!");
+                }
 
                 (Halted, None, None)
             }
@@ -294,7 +331,7 @@ mod tests {
 
     #[test]
     fn web_test_1() {
-        //sum-of-primes: This program takes a single input and produces a single output, the sum of all primes up to the input.
+        // sum-of-primes: This program takes a single input and produces a single output, the sum of all primes up to the input.
         let mut memory = [
             3, 100, 1007, 100, 2, 7, 1105, -1, 87, 1007, 100, 1, 14, 1105, -1, 27, 101, -2, 100,
             100, 101, 1, 101, 101, 1105, 1, 9, 101, 105, 101, 105, 101, 2, 104, 104, 101, 1, 102,
@@ -306,8 +343,9 @@ mod tests {
             Ok(17),
             IntcodeComputer::read_program(&mut memory, &mut vec![10])
         );
+
         assert_eq!(
-            Ok(17),
+            Ok(142913828922),
             IntcodeComputer::read_program(&mut memory, &mut vec![2000000])
         );
     }
@@ -369,7 +407,10 @@ mod tests {
         ];
 
         // Guessed 203, too low
-        IntcodeComputer::read_program(&mut memory, &mut vec![1]).unwrap();
+        assert_eq!(
+            Ok(3380552333),
+            IntcodeComputer::read_program(&mut memory, &mut vec![1])
+        );
     }
 
     #[test]
@@ -452,6 +493,111 @@ mod tests {
         assert_eq!(
             Ok(11956381),
             IntcodeComputer::read_program(&mut memory.clone(), &mut vec![5])
+        );
+    }
+
+    #[test]
+    fn part2_example1() {
+        let memory = [3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8];
+        // Using position mode, consider whether the input is equal to 8;
+        // output 1 (if it is) or 0 (if it is not).
+
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+        );
+        assert_eq!(
+            Ok(1),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+        );
+    }
+
+    #[test]
+    fn part2_example2() {
+        let memory = [3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8];
+        // Using position mode, consider whether the input is less than 8;
+        // output 1 (if it is) or 0 (if it is not).
+
+        assert_eq!(
+            Ok(1),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+        );
+    }
+
+    #[test]
+    fn part2_example3() {
+        let memory = [3, 3, 1108, -1, 8, 3, 4, 3, 99];
+        // Using immediate mode, consider whether the input is equal to 8;
+        // output 1 (if it is) or 0 (if it is not).
+
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+        );
+        assert_eq!(
+            Ok(1),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+        );
+    }
+
+    #[test]
+    fn part2_example4() {
+        let memory = [3, 3, 1107, -1, 8, 3, 4, 3, 99];
+        // Using immediate mode, consider whether the input is less than 8;
+        // output 1 (if it is) or 0 (if it is not).
+
+        assert_eq!(
+            Ok(1),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+        );
+        assert_eq!(
+            Ok(0),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
+        );
+    }
+
+    #[test]
+    fn part2_example5() {
+        let memory = [
+            3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36, 98, 0,
+            0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000, 1, 20, 4,
+            20, 1105, 1, 46, 98, 99,
+        ];
+        //The above example program uses an input instruction to ask for a single number.
+        // The program will then output 999 if the input value is below 8, output 1000 if
+        // the input value is equal to 8, or output 1001 if the input value is greater than 8.
+
+        assert_eq!(
+            Ok(999),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![7])
+        );
+        assert_eq!(
+            Ok(1000),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![8])
+        );
+        assert_eq!(
+            Ok(1001),
+            IntcodeComputer::read_program(&mut memory.clone(), &mut vec![9])
         );
     }
 }
