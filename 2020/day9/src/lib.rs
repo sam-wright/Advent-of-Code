@@ -36,18 +36,19 @@ pub fn find_error(input: &Vec<i64>, preamble_size: usize) -> i64 {
 
     // process data
     for i in preamble_size as usize..input.len() {
-        match is_valid(&cypher, input[i]) {
-            true => {}
-            false => return input[i],
+        if !is_valid(&cypher, input[i]) {
+            return input[i];
         }
+
         cypher.pop_back();
         cypher.push_front(input[i]);
     }
 
+    // failure
     -1
 }
 
-pub fn find_pair(input: &Vec<i64>, error: i64) -> Vec<i64> {
+pub fn find_weakness_set(input: &Vec<i64>, error: i64) -> Vec<i64> {
     for i in 0..input.len() - 1 {
         let mut k = 0;
         let mut value = 0;
@@ -55,11 +56,8 @@ pub fn find_pair(input: &Vec<i64>, error: i64) -> Vec<i64> {
             value += input[i + k];
 
             if value == error {
-                println!("success!");
-                let mut ans = Vec::new();
-                for j in i..=i + k {
-                    ans.push(input[j]);
-                }
+                let ans: Vec<i64> = input[i..=i + k].iter().map(|x| x.clone()).collect();
+                return ans;
             }
 
             if value > error {
@@ -68,7 +66,26 @@ pub fn find_pair(input: &Vec<i64>, error: i64) -> Vec<i64> {
             k += 1;
         }
     }
+
+    //failure
     return Vec::new();
+}
+
+pub fn find_weakness_set_improved(input: &Vec<i64>, error: i64) -> VecDeque<i64> {
+    let mut weakness_set = VecDeque::new();
+    let mut input: VecDeque<i64> = input.iter().map(|x|{x.clone()}).collect();
+    loop {
+        let value: i64 = weakness_set.iter().sum();
+        if value > error {
+            weakness_set.pop_back();
+        } else if value == error {
+            break;
+        } else {
+            weakness_set.push_front(input.pop_front().unwrap());
+        }
+    }
+
+    weakness_set
 }
 
 #[cfg(test)]
@@ -94,7 +111,7 @@ mod tests {
         let input = read_input("example1.txt");
         let error = find_error(&input, 5);
 
-        let pair = find_pair(&input, error);
+        let pair = find_weakness_set(&input, error);
         let ans = pair.iter().max().unwrap() + pair.iter().min().unwrap();
 
         assert_eq!(ans, 62);
@@ -105,7 +122,18 @@ mod tests {
         let input = read_input("input.txt");
         let error = find_error(&input, 25);
 
-        let pair = find_pair(&input, error);
+        let pair = find_weakness_set(&input, error);
+        let ans = pair.iter().max().unwrap() + pair.iter().min().unwrap();
+
+        assert_eq!(ans, 177989832);
+    }
+
+    #[test]
+    fn part_2_solution_improved() {
+        let input = read_input("input.txt");
+        let error = find_error(&input, 25);
+
+        let pair = find_weakness_set_improved(&input, error);
         let ans = pair.iter().max().unwrap() + pair.iter().min().unwrap();
 
         assert_eq!(ans, 177989832);
