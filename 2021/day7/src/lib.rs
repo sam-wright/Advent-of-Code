@@ -19,6 +19,10 @@ pub fn align_to(positions: &[i32], desired_position: i32) -> i32 {
 }
 
 pub fn crab_align_to(positions: &[i32], desired_position: i32) -> i32 {
+    //
+    // simply observe that the cost function follows the triangle series
+    // 0, 1, 3, 6, 10, 15, ...
+    //
     positions.iter().fold(0, |cost, x| {
         let f = (x - desired_position).abs();
         cost + f * (f + 1) / 2
