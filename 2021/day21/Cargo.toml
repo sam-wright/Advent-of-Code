@@ -1,0 +1,10 @@
+[package]
+name = "day21"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+memoize = {version = "0.1.9", feature="full"}
+lazy_static = "1.4.0"
