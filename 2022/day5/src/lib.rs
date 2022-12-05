@@ -1,11 +1,10 @@
 use std::{
-    collections::HashSet,
     fs::File,
     io::{BufRead, BufReader},
 };
 
 extern crate regex;
-use regex::{Captures, Regex};
+use regex::Regex;
 
 fn do_move(from: usize, to: usize, mut stacks: Vec<Vec<char>>) -> Vec<Vec<char>> {
     let v = stacks[from - 1].pop().unwrap();
@@ -55,8 +54,7 @@ pub fn read_input_9001(filename: &str, start: usize, mut stacks: Vec<Vec<char>>)
             let times = caps[1].parse::<usize>().unwrap();
 
             let l = stacks[from - 1].len() - times;
-            let moving: Vec<char> = stacks[from - 1].split_off(l);
-            for m in moving {
+            for m in stacks[from - 1].split_off(l) {
                 stacks[to - 1].push(m);
             }
         }
